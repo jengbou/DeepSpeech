@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# pylint: disable=cyclic-import,import-outside-toplevel
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -28,7 +29,7 @@ def fail(message, code=1):
 
 
 def transcribe_file(audio_path, tlog_path):
-    from deepspeech_training.train import create_model  # pylint: disable=cyclic-import,import-outside-toplevel
+    from deepspeech_training.train import create_model
     from deepspeech_training.util.checkpoints import load_graph_for_evaluation
     initialize_globals()
     scorer = Scorer(FLAGS.lm_alpha, FLAGS.lm_beta, FLAGS.scorer_path, Config.alphabet)
@@ -59,7 +60,8 @@ def transcribe_file(audio_path, tlog_path):
                         session.run([batch_time_start, batch_time_end, transposed, batch_x_len])
                 except tf.errors.OutOfRangeError:
                     break
-                decoded = ctc_beam_search_decoder_batch(batch_logits, batch_lengths, Config.alphabet, FLAGS.beam_width,
+                decoded = ctc_beam_search_decoder_batch(batch_logits, batch_lengths,
+                                                        Config.alphabet, FLAGS.beam_width,
                                                         num_processes=num_processes,
                                                         scorer=scorer)
                 decoded = list(d[0][1] for d in decoded)
@@ -72,9 +74,9 @@ def transcribe_file(audio_path, tlog_path):
                 json.dump(transcripts, tlog_file, default=float)
 
 
-def transcribe_many(src_paths,dst_paths):
+def transcribe_many(src_paths, dst_paths):
     pbar = create_progressbar(prefix='Transcribing files | ', max_value=len(src_paths)).start()
-    for i in range(len(src_paths)):
+    for i, _ in enumerate(src_paths):
         p = Process(target=transcribe_file, args=(src_paths[i], dst_paths[i]))
         p.start()
         p.join()
@@ -115,11 +117,11 @@ def main(_):
                 if any(map(lambda e: not os.path.isfile(e[0]), catalog_entries)):
                     fail('Missing source file(s) in catalog')
                 if not FLAGS.force and any(map(lambda e: os.path.isfile(e[1]), catalog_entries)):
-                    fail('Destination file(s) from catalog already existing, use --force for overwriting')
+                    fail('Destination file(s) from catalog already exists, use --force for overwriting')
                 if any(map(lambda e: not os.path.isdir(os.path.dirname(e[1])), catalog_entries)):
                     fail('Missing destination directory for at least one catalog entry')
-                src_paths,dst_paths = zip(*paths)
-                transcribe_many(src_paths,dst_paths)
+                src_paths, dst_paths = zip(*catalog_entries)
+                transcribe_many(src_paths, dst_paths)
             else:
                 # Transcribe one file
                 dst_path = os.path.abspath(FLAGS.dst) if FLAGS.dst else os.path.splitext(src_path)[0] + '.tlog'
@@ -143,8 +145,8 @@ def main(_):
                     wav_paths = glob.glob(src_path + "/*.wav")
                 else:
                     wav_paths = glob.glob(src_path + "/**/*.wav")
-                dst_paths = [path.replace('.wav','.tlog') for path in wav_paths]
-                transcribe_many(wav_paths,dst_paths)
+                dst_paths = [path.replace('.wav', '.tlog') for path in wav_paths]
+                transcribe_many(wav_paths, dst_paths)
 
 
 if __name__ == '__main__':
