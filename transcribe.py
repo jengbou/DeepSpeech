@@ -13,6 +13,9 @@ tflogging.set_verbosity(tflogging.ERROR)
 import logging
 logging.getLogger('sox').setLevel(logging.ERROR)
 import glob
+import filetype
+import subprocess
+from pathlib import Path
 
 from deepspeech_training.util.audio import AudioFile
 from deepspeech_training.util.config import Config, initialize_globals
@@ -37,6 +40,29 @@ def transcribe_file(audio_path, tlog_path):
         num_processes = cpu_count()
     except NotImplementedError:
         num_processes = 1
+
+    if not filetype.is_audio(audio_path):
+        # Supported audio formats can be found here (https://pypi.org/project/filetype/)
+        logging.info("[%s] is not an audio file. Skipped.", audio_path)
+        return
+
+    if filetype.guess(audio_path).extension != "wav":
+        logging.info("[%s] is not in wav format. Converting to wav."%(audio_path))
+        in_folder = Path(audio_path).parent.absolute()
+        try:
+            subprocess.run([
+                "soundconverter",
+                "{file}".format(file=audio_path),
+                "-b", "-f", "wav", "-q 16",
+                "-o", "{folder}".format(folder=in_folder),
+                "-p", "CONVERTED/{filename}"
+                ])
+        except:
+            logging.warning("Skipped as conversion to wav failed for file: [%s]", audio_path)
+            return
+        audio_path = os.path.join(in_folder, "CONVERTED", Path(audio_path).stem + ".wav")
+        logging.info("Transcribing converted file [%s]", audio_path)
+
     with AudioFile(audio_path, as_path=True) as wav_path:
         data_set = split_audio_file(wav_path,
                                     batch_size=FLAGS.batch_size,
@@ -142,10 +168,10 @@ def main(_):
             else:
                 if not FLAGS.recursive:
                     print("If you wish to recursively scan --src, then you must use --recursive")
-                    wav_paths = glob.glob(src_path + "/*.wav")
+                    wav_paths = glob.glob(src_path + "/*.*")
                 else:
-                    wav_paths = glob.glob(src_path + "/**/*.wav")
-                dst_paths = [path.replace('.wav', '.tlog') for path in wav_paths]
+                    wav_paths = glob.glob(src_path + "/**/*.*")
+                dst_paths = [Path(path).with_suffix('.tlog') for path in wav_paths]
                 transcribe_many(wav_paths, dst_paths)
 
 

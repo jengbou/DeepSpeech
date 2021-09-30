@@ -1,1 +1,3 @@
 webrtcvad
+filetype
+pathlib
