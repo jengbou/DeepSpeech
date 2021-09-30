@@ -47,7 +47,7 @@ def transcribe_file(audio_path, tlog_path):
         return
 
     if filetype.guess(audio_path).extension != "wav":
-        logging.info("[%s] is not in wav format. Converting to wav."%(audio_path))
+        logging.info("[%s] is not in wav format. Converting to wav.", audio_path)
         in_folder = Path(audio_path).parent.absolute()
         try:
             subprocess.run([
