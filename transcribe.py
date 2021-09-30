@@ -150,7 +150,7 @@ def main(_):
                 transcribe_many(src_paths, dst_paths)
             else:
                 # Transcribe one file
-                dst_path = os.path.abspath(FLAGS.dst) if FLAGS.dst else os.path.splitext(src_path)[0] + '.tlog'
+                dst_path = os.path.abspath(FLAGS.dst) if FLAGS.dst else src_path + '.tlog'
                 if os.path.isfile(dst_path):
                     if FLAGS.force:
                         transcribe_one(src_path, dst_path)
@@ -171,7 +171,7 @@ def main(_):
                     wav_paths = glob.glob(src_path + "/*.*")
                 else:
                     wav_paths = glob.glob(src_path + "/**/*.*")
-                dst_paths = [Path(path).with_suffix('.tlog') for path in wav_paths]
+                dst_paths = [Path(path).with_suffix("".join(Path(path).suffixes) + '.tlog') for path in wav_paths]
                 transcribe_many(wav_paths, dst_paths)
 
 
