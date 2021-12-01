@@ -30,6 +30,17 @@ def fail(message, code=1):
     log_error(message)
     sys.exit(code)
 
+def has_video(input_path):
+    res = subprocess.run(["ffprobe", "-i", "{}".format(input_path),
+        "-show_streams", "-select_streams", "v", "-loglevel", "error"],
+        stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+    return len(res.stdout) > 0
+
+def has_audio(input_path):
+    res = subprocess.run(["ffprobe", "-i", "{}".format(input_path),
+        "-show_streams", "-select_streams", "a", "-loglevel", "error"],
+        stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+    return len(res.stdout) > 0
 
 def transcribe_file(audio_path, tlog_path):
     from deepspeech_training.train import create_model
@@ -43,9 +54,31 @@ def transcribe_file(audio_path, tlog_path):
 
     if not filetype.is_audio(audio_path):
         # Supported audio formats can be found here (https://pypi.org/project/filetype/)
-        logging.info("[%s] is not an audio file. Skipped.", audio_path)
-        return
+        # In case it's a video, extract audio from video first
+        if has_video(audio_path):
+            if not has_audio(audio_path):
+                logging.info("{} is a video without audio. Skipped.".format(audio_path))
+                return
+            out_audio = "{}_audio.wav".format(audio_path)
+            logging.info("[%s] is a video, extract its audio first into [%s].", audio_path,
+                out_audio)
+            try:
+                subprocess.run([
+                "vlc", "-v",
+                "-I", "dummy", "--no-sout-video", "--sout-audio", "--no-sout-rtp-sap", "--no-sout-standard-sap",
+                "--ttl=1", "--sout-keep", "--sout",
+                "#transcode{acodec=s16l,channels=2}:std{access=file,mux=wav,dst=%s"%out_audio,
+                "{in_file}".format(in_file=audio_path), "vlc://quit"
+                ])
+            except:
+                logging.warning("Skipped as extracting audio from video failed for file: [%s]", audio_path)
+                return
+            audio_path = out_audio
+        else:
+            logging.info("[%s] is not a supported audio file type. Skipped.", audio_path)
+            return
 
+    logging.info('Transcribed file [{}] to [{}]'.format(audio_path, tlog_path))
     if filetype.guess(audio_path).extension != "wav":
         logging.info("[%s] is not in wav format. Converting to wav.", audio_path)
         in_folder = Path(audio_path).parent.absolute()
@@ -113,7 +146,7 @@ def transcribe_many(src_paths, dst_paths):
 
 def transcribe_one(src_path, dst_path):
     transcribe_file(src_path, dst_path)
-    log_info('Transcribed file "{}" to "{}"'.format(src_path, dst_path))
+    # log_info('Transcribed file "{}" to "{}"'.format(src_path, dst_path))
 
 
 def resolve(base_path, spec_path):
