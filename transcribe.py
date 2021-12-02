@@ -52,6 +52,7 @@ def transcribe_file(audio_path, tlog_path):
     except NotImplementedError:
         num_processes = 1
 
+    audio_from_video = False
     if not filetype.is_audio(audio_path):
         # Supported audio formats can be found here (https://pypi.org/project/filetype/)
         # In case it's a video, extract audio from video first
@@ -73,12 +74,19 @@ def transcribe_file(audio_path, tlog_path):
             except:
                 logging.warning("Skipped as extracting audio from video failed for file: [%s]", audio_path)
                 return
+            audio_from_video = True
             audio_path = out_audio
         else:
             logging.info("[%s] is not a supported audio file type. Skipped.", audio_path)
             return
 
-    logging.info('Transcribed file [{}] to [{}]'.format(audio_path, tlog_path))
+    if os.path.getsize(audio_path) == 0:
+        logging.warning("Skipped because the filesize is 0 for the file: [%s]", audio_path)
+        if audio_from_video:
+            logging.warning("Remove file: [%s]", audio_path)
+            os.remove(audio_path)
+        return
+
     if filetype.guess(audio_path).extension != "wav":
         logging.info("[%s] is not in wav format. Converting to wav.", audio_path)
         in_folder = Path(audio_path).parent.absolute()
@@ -96,6 +104,7 @@ def transcribe_file(audio_path, tlog_path):
         audio_path = os.path.join(in_folder, "CONVERTED", Path(audio_path).stem + ".wav")
         logging.info("Transcribing converted file [%s]", audio_path)
 
+    logging.info('Start transcribing file [{}] to [{}]'.format(audio_path, tlog_path))
     with AudioFile(audio_path, as_path=True) as wav_path:
         data_set = split_audio_file(wav_path,
                                     batch_size=FLAGS.batch_size,
@@ -131,7 +140,7 @@ def transcribe_file(audio_path, tlog_path):
                             'transcript': transcript} for start, end, transcript in transcripts]
             with open(tlog_path, 'w') as tlog_file:
                 json.dump(transcripts, tlog_file, default=float)
-
+    logging.info('Finish transcribing file [{}] to [{}]'.format(audio_path, tlog_path))
 
 def transcribe_many(src_paths, dst_paths):
     pbar = create_progressbar(prefix='Transcribing files | ', max_value=len(src_paths)).start()
