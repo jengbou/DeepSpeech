@@ -97,7 +97,7 @@ def transcribe_file(audio_path, tlog_path):
                 "-b", "-f", "wav", "-q 16",
                 "-o", "{folder}".format(folder=in_folder),
                 "-p", "CONVERTED/{filename}"
-                ])
+                ], check=True)
         except:
             logging.warning("Skipped as conversion to wav failed for file: [%s]", audio_path)
             return
